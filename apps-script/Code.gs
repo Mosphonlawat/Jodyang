@@ -91,6 +91,7 @@ function bootstrap_(body) {
     if (rows_('Users').some((row) => row.role === 'admin')) return { ok: false, error: 'มีบัญชีแอดมินแล้ว กรุณาเข้าสู่ระบบ' };
     const user = newUser_(body.username, body.displayName, 'admin', body.password);
     append_('Users', user);
+    props.setProperty('OWNER_USER_ID', user.id);
     props.deleteProperty('SETUP_KEY');
     appendAudit_({ id: user.id, displayName: user.displayName }, 'สร้างบัญชีแอดมิน', 'ผู้ใช้งาน', user.username);
     return issueSession_(user);
@@ -117,7 +118,7 @@ function issueSession_(user) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_HOURS * 60 * 60 * 1000).toISOString();
   append_('Sessions', { id: sha256_(token), userId: user.id, expiresAt, revoked: false, createdAt: now.toISOString() });
-  return { ok: true, token, user: publicUser_(user), data: pull_(user) };
+  return { ok: true, token, user: publicUser_(user) };
 }
 
 function verifySession_(token) {
@@ -281,6 +282,7 @@ function setUserActive_(body) {
   const target = readById_('Users', String(body.userId || ''));
   if (!target) return { ok:false, error:'ไม่พบบัญชีนี้' };
   if (target.id === user.id) return { ok:false, error:'ไม่สามารถปิดบัญชีที่กำลังใช้งานได้' };
+  if (target.id === ownerUserId_() && !body.active) return { ok:false, error:'บัญชีผู้ดูแลหลักปิดใช้งานไม่ได้' };
   if (body.active && rows_('Users').some((row) => row.id !== target.id && row.active !== false && String(row.username || '').trim().toLowerCase() === String(target.username || '').trim().toLowerCase())) return { ok:false, error:'เปิดบัญชีไม่ได้ เพราะมีบัญชีที่ใช้ชื่อผู้ใช้นี้อยู่แล้ว กรุณาเปลี่ยนชื่อบัญชีที่ซ้ำก่อน' };
   if (target.role === 'admin' && target.active !== false && !body.active && !rows_('Users').some((row) => row.role === 'admin' && row.active !== false && row.id !== target.id)) return { ok:false, error:'ต้องมีแอดมินที่ใช้งานได้อย่างน้อยหนึ่งบัญชี' };
   target.active = Boolean(body.active);
@@ -300,6 +302,7 @@ function deleteUser_(body) {
     const target = readById_('Users', String(body.userId || ''));
     if (!target) return { ok:false, error:'ไม่พบบัญชีนี้ อาจถูกลบไปแล้ว' };
     if (target.id === user.id) return { ok:false, error:'ไม่สามารถลบบัญชีที่กำลังใช้งานได้' };
+    if (target.id === ownerUserId_()) return { ok:false, error:'บัญชีผู้ดูแลหลักลบไม่ได้ เพื่อป้องกันการสูญเสียสิทธิ์เข้าระบบ' };
     if (target.role === 'admin' && !rows_('Users').some((row) => row.id !== target.id && row.role === 'admin' && row.active !== false)) return { ok:false, error:'ต้องเหลือบัญชีแอดมินที่ใช้งานได้อย่างน้อยหนึ่งบัญชี' };
     revokeUserSessions_(target.id);
     if (!deleteById_('Users', target.id)) return { ok:false, error:'ลบบัญชีไม่สำเร็จ กรุณาลองใหม่' };
@@ -367,7 +370,18 @@ function publicUser_(user) {
   const result = Object.assign({}, user);
   delete result.passwordHash;
   delete result.passwordSalt;
+  result.isOwner = user.id === ownerUserId_();
   return result;
+}
+
+function ownerUserId_() {
+  const props = PropertiesService.getScriptProperties();
+  const saved = props.getProperty('OWNER_USER_ID');
+  if (saved) return saved;
+  const firstAdmin = rows_('Users').find((row) => row.role === 'admin');
+  if (!firstAdmin) return '';
+  props.setProperty('OWNER_USER_ID', String(firstAdmin.id));
+  return String(firstAdmin.id);
 }
 
 function passwordHash_(password, salt) {

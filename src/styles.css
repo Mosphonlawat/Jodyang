@@ -115,6 +115,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Mobile navigation follows the compact, edge-to-edge sheet pattern from the reference. */
 .mobile-menu-backdrop { z-index: 45; overscroll-behavior: contain; }
 .mobile-menu-panel { width: min(520px,100%); max-height: min(88dvh,760px); margin: 0 auto; overflow: auto; border-radius: 26px 26px 0 0; background: #fff; box-shadow: 0 -14px 44px #17344f20; animation: menuSheetIn .2s ease-out; }
+.mobile-menu-footer { position: sticky; bottom: 0; display: grid; gap: 12px; padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #e8eef5; background: #ffffffef; backdrop-filter: blur(16px); }
+.mobile-menu-account { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.mobile-menu-account > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.mobile-menu-account strong { overflow: hidden; color: #263746; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-menu-account small { color: #8192a3; font-size: 11px; }
+.mobile-menu-avatar { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #e4f0fb; color: #456c8b; font-weight: 700; }
+.mobile-menu-logout { width: 100%; min-height: 46px; border-color: #f1dfdc; background: #fff6f4; color: #a84031; }
+.mobile-menu-logout:hover { background: #ffefec; }
 .mobile-menu-handle { width: 38px; height: 4px; margin: 10px auto 7px; border-radius: 999px; background: #dce1da; }
 .mobile-menu-link { display: flex; width: 100%; min-height: 52px; align-items: center; gap: 12px; padding: 7px 10px; border: 1px solid transparent; border-radius: 15px; color: #4f5850; font-size: 14px; font-weight: 550; text-align: left; transition: .15s ease; }
 .mobile-menu-link:hover { background: #f5f8fb; color: #202b22; }

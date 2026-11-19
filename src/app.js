@@ -97,14 +97,18 @@ export function mountApp(root) {
     state.session = session;
     state.error = '';
     persistSession();
-    if (session.data) state.data = normalizeData(session.data);
+    state.data = normalizeData(session.data || EMPTY_DATA);
     render();
     if (navigator.onLine) {
-      await pullFresh();
-      await flushQueue();
+      const token = session.token;
+      void (async () => {
+        if (!session.data) await pullFresh();
+        if (state.session?.token !== token) return;
+        await flushQueue();
+        if (state.data.settings?.latitude && state.data.settings?.longitude) loadWeather();
+      })();
     }
-    if (state.data.settings?.latitude && state.data.settings?.longitude) loadWeather();
-    await refreshPending();
+    void refreshPending();
   }
 
   async function pullFresh() {
@@ -197,13 +201,13 @@ export function mountApp(root) {
       if (action === 'login') {
         const result = await api('login', values);
         await enterSession({ token: result.token, user: result.user, data: result.data });
-        showToast('เข้าสู่ระบบแล้ว');
+        showToast('เข้าสู่ระบบแล้ว กำลังโหลดข้อมูลสวน');
       } else {
         const result = await api('bootstrap', values);
         state.setup = false;
         await cacheSet('needs-setup', false).catch(() => {});
         await enterSession({ token: result.token, user: result.user, data: result.data });
-        showToast('สร้างบัญชีผู้ดูแลเรียบร้อย');
+        showToast('สร้างบัญชีผู้ดูแลแล้ว กำลังโหลดข้อมูลสวน');
       }
     } catch (error) {
       state.error = error.message;
@@ -486,8 +490,10 @@ export function mountApp(root) {
     if(action==='delete')return removeRecord(button.dataset.table,button.dataset.id);
     if(action==='sync'){await flushQueue();await pullFresh();showToast('ตรวจสอบการซิงก์เรียบร้อย');return;}
     if(action==='logout'){
-      try { if(navigator.onLine) await api('logout',{token:state.session.token}); } catch {}
-      state.session=null;persistSession();state.data=normalizeData(await cacheGet('farm-data').catch(()=>EMPTY_DATA));await loadSetupState();showToast('ออกจากระบบแล้ว');return;
+      const token=state.session?.token;
+      state.session=null;state.setup=false;state.data=normalizeData(EMPTY_DATA);state.pending=0;persistSession();render();showToast('ออกจากระบบแล้ว');
+      if(token&&navigator.onLine)void api('logout',{token}).catch(()=>{});
+      return;
     }
     if(action==='weather-refresh'){await loadWeather();return;}
     if(action==='edit-weather'){if(state.session.user.role==='admin'){state.page='settings';render();}else showToast('ให้แอดมินตั้งค่าพิกัดสวน','warning');return;}
