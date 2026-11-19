@@ -1,0 +1,291 @@
+import { active, plotLedger, shareTotals, monthlySeries } from './lib/calculations.js';
+import { dateKey, dateLabel, escapeHtml as e, money, number, todayText } from './lib/format.js';
+
+const icons = {
+  home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/>',
+  tap: '<path d="M4 20c7-1 9-8 16-16M7 20c0-5 4-9 9-9M5 7l2 2m7-7 2 2"/>',
+  plot: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16M3 11h18"/>',
+  sale: '<path d="M3 5h2l2.5 11h10.8l2-7H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M12 2v6m-3-3h6"/>',
+  expense: '<path d="M4 5h16v15H4zM8 9h8M8 13h4m4 5H8"/>',
+  share: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z"/>',
+  weather: '<path d="M7 18h10a4 4 0 0 0 .3-8A6 6 0 0 0 6 9.2 4.4 4.4 0 0 0 7 18Z"/><path d="m9 21-1 2m6-2-1 2m6-2-1 2"/>',
+  report: '<path d="M4 3h12l4 4v14H4zM16 3v5h5M8 13h8M8 17h8M8 9h3"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m6-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-7.5a4 4 0 0 1 0 7.8m3 9.7v-2a4 4 0 0 0-3-3.9"/>',
+  audit: '<path d="M4 4h16v17H4zM8 8h8m-8 4h8m-8 4h5"/><path d="M8 2v4m8-4v4"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.2 1-1.2 2.1-1.5-.5a8 8 0 0 1-1.4.8l-.3 1.5h-2.5l-.3-1.5a8 8 0 0 1-1.4-.8l-1.5.5-1.2-2.1 1.2-1a7 7 0 0 1 0-1.7l-1.2-1 1.2-2.1 1.5.5a8 8 0 0 1 1.4-.8l.3-1.5h2.5l.3 1.5a8 8 0 0 1 1.4.8l1.5-.5 1.2 2.1-1.2 1a7 7 0 0 1-.1 1.7Z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  cloud: '<path d="M3 12a9 9 0 0 1 18 0M3 12h18M12 3v18M5.6 5.6c3.5 3.4 9.3 3.4 12.8 0M5.6 18.4c3.5-3.4 9.3-3.4 12.8 0"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  close: '<path d="m6 6 12 12M18 6 6 18"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/>',
+  edit: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M5 21h14"/>',
+  logout: '<path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/>',
+  receipt: '<path d="M5 3h14v18l-3-2-4 2-4-2-3 2zM8 8h8m-8 4h8m-8 4h4"/>',
+  rain: '<path d="M7 15h10a4 4 0 0 0 .2-8A6 6 0 0 0 6 6.5 4.4 4.4 0 0 0 7 15Zm1 3-1 3m6-3-1 3m6-3-1 3"/>',
+  leaf: '<path d="M20 4c-8 0-14 3-14 10a6 6 0 0 0 6 6c7 0 10-7 8-16Z"/><path d="M4 21c3-5 7-8 13-11"/>',
+};
+
+export function icon(name, size = 18) {
+  return `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[name] || icons.leaf}</svg>`;
+}
+
+export function datePickerField(title,name,value=dateKey()) {
+  const isRange=name==='from'||name==='to';
+  const selected=isRange&&!value?'':/^\d{4}-\d{2}-\d{2}$/.test(value)?value:dateKey();
+  const [year,month]=(selected||dateKey()).split('-').map(Number);
+  const rangeAttribute=name==='from'||name==='to'?`data-range="${name}"`:'';
+  return `<div class="date-picker" data-date-picker data-view-year="${year}" data-view-month="${month-1}"><label class="mb-1.5 block text-sm font-medium">${title}</label><input type="hidden" name="${name}" value="${e(selected)}" data-date-value ${rangeAttribute}><button type="button" class="field date-picker-trigger" data-action="date-open" aria-haspopup="dialog" aria-expanded="false"><span data-date-label>${selected?dateLabel(selected):'เลือกวันที่'}</span>${icon('calendar',18)}</button><div class="date-picker-panel" data-date-panel role="dialog" aria-label="เลือกวันที่" hidden></div></div>`;
+}
+
+export function dateCalendarMarkup(year,month,selected) {
+  const firstWeekday=new Date(year,month,1).getDay();
+  const lastDay=new Date(year,month+1,0).getDate();
+  const today=dateKey();
+  const headings=['อา','จ','อ','พ','พฤ','ศ','ส'].map((day)=>`<span>${day}</span>`).join('');
+  const blanks=Array.from({length:firstWeekday},()=>'<span class="calendar-blank"></span>').join('');
+  const days=Array.from({length:lastDay},(_,index)=>{
+    const day=index+1;
+    const value=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return `<button type="button" class="calendar-day ${value===selected?'is-selected':''} ${value===today?'is-today':''}" data-action="date-select" data-date-value="${value}" aria-pressed="${value===selected}">${day}</button>`;
+  }).join('');
+  const monthName=new Date(year,month,1).toLocaleDateString('th-TH',{month:'long',year:'numeric'});
+  return `<div class="calendar-heading"><button type="button" class="calendar-nav" data-action="date-month" data-delta="-1" aria-label="เดือนก่อนหน้า">‹</button><strong>${monthName}</strong><button type="button" class="calendar-nav" data-action="date-month" data-delta="1" aria-label="เดือนถัดไป">›</button></div><div class="calendar-weekdays">${headings}</div><div class="calendar-days">${blanks}${days}</div><div class="calendar-footer"><span>เลือกวันที่</span><button type="button" data-action="date-today">ไปวันที่วันนี้</button></div>`;
+}
+
+const navItems = [
+  { id: 'dashboard', title: 'ภาพรวมสวน', icon: 'home' },
+  { id: 'tapping', title: 'บันทึกรอบกรีด', icon: 'tap' },
+  { id: 'plots', title: 'แปลงสวน', icon: 'plot', admin: true },
+  { id: 'sales', title: 'การขายยาง', icon: 'sale' },
+  { id: 'expenses', title: 'ค่าใช้จ่าย', icon: 'expense' },
+  { id: 'shares', title: 'ส่วนแบ่งผลผลิต', icon: 'share' },
+  { id: 'weather', title: 'สภาพอากาศ', icon: 'weather' },
+  { id: 'reports', title: 'รายงาน', icon: 'report' },
+  { id: 'users', title: 'ผู้ใช้งาน', icon: 'users', admin: true },
+  { id: 'audit', title: 'ประวัติการใช้งาน', icon: 'audit', admin: true },
+  { id: 'settings', title: 'ตั้งค่าระบบ', icon: 'settings', admin: true },
+];
+
+export function renderShell({ page, user, pending = 0, online = true, child }) {
+  const visible = navItems.filter((item) => !item.admin || user.role === 'admin');
+  const title = navItems.find((item) => item.id === page)?.title || 'ภาพรวมสวน';
+  const nav = visible.map((item) => `<button class="nav-link ${page === item.id ? 'active' : ''}" data-action="go" data-page="${item.id}">${icon(item.icon)}<span>${item.title}</span></button>`).join('');
+  const dock = [
+    ['dashboard', 'home', 'หน้าแรก'], ['tapping', 'tap', 'กรีด'], ['new', 'plus', 'เพิ่ม'], ['sales', 'sale', 'ขาย'], ['more', 'menu', 'เมนู'],
+  ].map(([action, ico, label]) => `<button aria-label="${label}" class="${(action === page || (action === 'more' && page !== 'dashboard' && page !== 'tapping' && page !== 'sales')) ? 'active' : ''} ${action === 'new' ? 'dock-add' : ''}" data-action="${action === 'new' ? 'new' : action === 'more' ? 'mobile-menu' : 'go'}" ${action === 'new' ? 'data-kind="tapping"' : action === 'more' ? '' : `data-page="${action}"`}>${icon(ico, action === 'new' ? 23 : 20)}<span class="dock-label">${label}</span></button>`).join('');
+  return `<div class="app-shell flex min-h-screen">
+    <aside class="side-nav fixed inset-y-0 left-0 z-20 flex flex-col px-5 py-6">
+      <div class="mb-9 flex items-center gap-3 px-2"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-forest-900 text-leaf-100">${icon('leaf', 22)}</div><div><div class="text-[17px] font-bold tracking-tight">Jodyang</div><div class="mt-0.5 text-[10px] tracking-[.18em] text-muted">RUBBER FARM</div></div></div>
+      <div class="mb-2 px-3 text-[10px] font-bold tracking-[.15em] text-[#a1a69e]">เมนู</div><nav class="flex flex-col gap-1">${nav}</nav>
+      <div class="mt-auto border-t border-[#e8eef5] pt-4">
+        <div class="mb-4 rounded-2xl bg-paper p-3"><div class="flex items-center gap-2 text-xs font-semibold">${icon(online ? 'cloud' : 'rain', 16)}<span>${online ? 'ออนไลน์' : 'ออฟไลน์'}</span></div><div class="mt-1 text-[11px] text-muted">${pending ? `รอส่งข้อมูล ${pending} รายการ` : online ? 'ข้อมูลพร้อมซิงก์' : 'บันทึกไว้ในเครื่องนี้'}</div></div>
+        <div class="flex items-center gap-3 px-2"><div class="grid h-9 w-9 place-items-center rounded-full bg-leaf-100 font-bold text-forest-800">${e((user.displayName || user.username || 'จ').slice(0,1))}</div><div class="min-w-0 flex-1"><div class="truncate text-sm font-semibold">${e(user.displayName || user.username)}</div><div class="text-[11px] text-muted">${user.role === 'admin' ? 'ผู้ดูแลสวน' : user.role === 'tapper' ? 'คนกรีดยาง' : 'ผู้ดูข้อมูล'}</div></div><button class="btn btn-plain !p-2" title="ออกจากระบบ" data-action="logout">${icon('logout', 17)}</button></div>
+      </div>
+    </aside>
+    <div class="page-wrap min-h-screen lg:ml-[252px]">
+      <header class="topbar sticky top-0 z-10 hidden h-[66px] items-center justify-between border-b border-[#e9eae5] bg-paper/90 px-7 backdrop-blur lg:flex"><div class="text-sm text-[#989e96]">Jodyang <span class="mx-2">/</span><span class="text-ink">${title}</span></div><div class="flex items-center gap-4"><div class="text-xs text-[#777e76]">${todayText()}</div><div class="h-8 w-px bg-[#dfe7ef]"></div><div class="flex items-center gap-2 text-xs"><span class="h-2 w-2 rounded-full ${online ? 'bg-[#689568]' : 'bg-[#d39a58]'}"></span>${online ? 'เชื่อมต่อแล้ว' : 'ออฟไลน์'}${pending ? `<span class="rounded-full bg-[#fff0d9] px-2 py-1 text-[#986827]">ค้าง ${pending}</span>` : ''}</div></div></header>
+      <header class="flex items-center justify-between px-5 pb-1 pt-5 lg:hidden"><div><div class="text-xs text-muted">${todayText()}</div><h1 class="mt-1 text-xl font-bold">${title}</h1></div><button class="grid h-10 w-10 place-items-center rounded-full bg-white" data-action="user-menu" aria-label="บัญชีผู้ใช้">${e((user.displayName || user.username || 'จ').slice(0,1))}</button></header>
+      <main id="page-content" class="page-content mx-auto w-full max-w-[1440px] px-4 pb-10 pt-4 sm:px-6 lg:px-8 lg:pt-7">${child}</main>
+    </div>
+    <nav class="mobile-dock" aria-label="เมนูหลัก">${dock}</nav>
+    <div id="modal-root"></div><div id="toast-root" class="pointer-events-none fixed right-4 top-4 z-[60] flex flex-col gap-2"></div>
+  </div>`;
+}
+
+const empty = (title, detail) => `<div class="empty-state"><div><div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-paper text-leaf-700">${icon('leaf', 22)}</div><div class="font-semibold text-[#585e57]">${title}</div><div class="mt-1 text-xs">${detail}</div></div></div>`;
+const pageTitle = (title, detail, action = '') => `<div class="mb-6 flex flex-wrap items-end justify-between gap-3"><div><h2 class="text-2xl font-bold tracking-tight">${title}</h2><p class="mt-1 text-sm text-muted">${detail}</p></div>${action}</div>`;
+const button = (label, action, kind, style = 'btn-primary', iconName = 'plus') => `<button class="btn ${style}" data-action="${action}" ${kind ? `data-kind="${kind}"` : ''}>${icon(iconName, 17)}${label}</button>`;
+const stat = (title, value, caption, iconName, color = 'bg-[#e8f2fc] text-forest-800') => `<article class="card p-4 sm:p-5"><div class="flex items-start justify-between gap-2"><div><div class="text-xs font-medium text-muted">${title}</div><div class="mt-2 text-[25px] font-bold tracking-tight sm:text-[29px]">${value}</div><div class="mt-1 text-xs text-muted">${caption}</div></div><div class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${color}">${icon(iconName, 18)}</div></div></article>`;
+const monthlyMetric = (title,value,caption,iconName) => `<article class="monthly-kpi"><div class="flex items-center justify-between gap-2"><span class="text-xs font-medium text-muted">${title}</span><span class="monthly-kpi-icon">${icon(iconName,17)}</span></div><div class="mt-2 text-xl font-bold tracking-tight sm:text-2xl">${value}</div><div class="mt-1 text-xs text-muted">${caption}</div></article>`;
+
+export function loginView({ setup = false, error = '' } = {}) {
+  return `<main class="grid min-h-screen bg-white lg:grid-cols-[1fr_1fr]">
+    <section class="flex items-center justify-center px-6 py-12"><div class="w-full max-w-[420px]">
+      <div class="mb-10 flex items-center gap-3"><div class="grid h-12 w-12 place-items-center rounded-2xl bg-forest-900 text-leaf-100">${icon('leaf', 25)}</div><div><div class="text-2xl font-bold">Jodyang</div><div class="text-xs text-muted">ระบบจัดการสวนยางพารา</div></div></div>
+      <h1 class="text-3xl font-bold tracking-tight">${setup ? 'เริ่มต้นใช้งาน' : 'ยินดีต้อนรับกลับ'}</h1><p class="mt-2 text-sm leading-6 text-muted">${setup ? 'สร้างบัญชีผู้ดูแลสวนบัญชีแรก บัญชีนี้จะใช้จัดการสิทธิ์และข้อมูลทั้งหมด' : 'เข้าสู่ระบบเพื่อดูและจัดการข้อมูลสวนยางของคุณ'}</p>
+      <form class="mt-8 space-y-4" data-form="${setup ? 'bootstrap' : 'login'}">
+        ${setup ? `<label class="block text-sm font-medium">รหัสตั้งค่าเริ่มต้น<input class="field mt-1.5" name="setupKey" type="password" autocomplete="off" required placeholder="กรอกรหัสที่ตั้งไว้ในระบบ"></label><label class="block text-sm font-medium">ชื่อที่แสดง<input class="field mt-1.5" name="displayName" required placeholder="ชื่อผู้ดูแลสวน"></label>` : ''}
+        <label class="block text-sm font-medium">ชื่อผู้ใช้<input class="field mt-1.5" name="username" autocomplete="username" required placeholder="ชื่อผู้ใช้"></label>
+        <label class="block text-sm font-medium">รหัสผ่าน<input class="field mt-1.5" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" minlength="8" required placeholder="อย่างน้อย 8 ตัวอักษร"></label>
+        ${error ? `<p class="rounded-xl bg-[#fff0ed] p-3 text-sm text-[#a84031]">${e(error)}</p>` : ''}
+        <button class="btn btn-primary w-full !py-3" type="submit">${setup ? 'สร้างบัญชีผู้ดูแล' : 'เข้าสู่ระบบ'}</button>
+      </form>
+      <p class="mt-6 text-center text-xs text-muted">บัญชีผู้ใช้สร้างได้โดยผู้ดูแลระบบเท่านั้น</p>
+    </div></section>
+    <section class="relative hidden overflow-hidden bg-[#f1f2ed] p-12 lg:flex lg:items-center"><div class="mx-auto max-w-[500px]">
+      <div class="mb-4 text-xs font-bold uppercase tracking-[.22em] text-leaf-700">JODYANG · RUBBER FARM</div><h2 class="text-4xl font-bold leading-tight tracking-tight">จัดการสวนให้เป็นระบบ<br>เห็นภาพผลผลิตได้ชัดเจน</h2>
+      <div class="mt-10 rounded-[28px] bg-forest-900 p-8 text-white shadow-xl"><div class="text-sm text-white/60">ภาพรวมสวน</div><div class="mt-3 text-3xl font-bold">บันทึก · วิเคราะห์ · แบ่งผลผลิต</div><div class="mt-8 flex items-end gap-2">${[42,66,51,79,55,92,70,84,58,76,61,90].map((h,i)=>`<div class="flex-1 rounded-t-md ${i===11?'bg-[#d7e7c7]':'bg-white/25'}" style="height:${h}px"></div>`).join('')}</div><div class="mt-3 flex justify-between text-[11px] text-white/50"><span>ม.ค.</span><span>มี.ค.</span><span>พ.ค.</span><span>ก.ค.</span><span>ก.ย.</span><span>พ.ย.</span></div></div>
+      <p class="mt-5 text-xs text-muted">ข้อมูลจะซิงก์กับ Google Sheets เมื่อเชื่อมต่ออินเทอร์เน็ต</p>
+    </div></section>
+  </main>`;
+}
+
+function chartBars(series) {
+  const width = 680; const height = 204; const left = 18; const top = 12; const plotHeight = 148;
+  const step = (width - left * 2) / series.length; const barW = Math.max(12, Math.min(29, step * 0.52));
+  const peak = Math.max(1, ...series.flatMap((item)=>[Number(item.gross||0),Number(item.expenses||0)]));
+  const groupW = Math.max(20, Math.min(36, step * .62)); const eachW = groupW / 2;
+  const bars = series.map((item, index) => {
+    const gross = Number(item.gross || 0); const expenses = Number(item.expenses || 0); const x = left + index * step + (step - groupW) / 2;
+    const gh = gross ? Math.max(4,gross/peak*plotHeight) : 3; const eh = expenses ? Math.max(4,expenses/peak*plotHeight) : 3;
+    const gy = top + plotHeight - gh; const ey = top + plotHeight - eh;
+    return `<rect class="chart-bar ${index === new Date().getMonth() ? 'emphasis' : ''}" x="${x}" y="${gy}" width="${eachW-1}" height="${gh}" rx="4"><title>รายได้ ${item.label}: ${money(gross)}</title></rect><rect x="${x+eachW}" y="${ey}" width="${eachW-1}" height="${eh}" rx="4" fill="#b9cee3"><title>ค่าใช้จ่าย ${item.label}: ${money(expenses)}</title></rect><text class="chart-label" x="${x + groupW/2}" y="${height-15}" text-anchor="middle">${item.label}</text>`;
+  }).join('');
+  const grid = [0, .33, .66, 1].map((part) => `<line class="chart-grid" x1="${left}" x2="${width-left}" y1="${top + plotHeight * part}" y2="${top + plotHeight * part}"/>`).join('');
+  return `<svg class="mt-4 w-full overflow-visible" viewBox="0 0 ${width} ${height}" role="img" aria-label="กราฟรายได้และค่าใช้จ่ายรายเดือน">${grid}${bars}</svg>`;
+}
+
+function dashboard(data, user, state) {
+  const now=new Date();
+  const year=Number(state.year||now.getFullYear());
+  const monthStart=dateKey(new Date(now.getFullYear(),now.getMonth(),1));
+  const monthEnd=dateKey(new Date(now.getFullYear(),now.getMonth()+1,0));
+  const monthLabel=now.toLocaleDateString('th-TH',{month:'long',year:'numeric'});
+  const series=monthlySeries(data,year);
+  const monthLedger=plotLedger(data,{from:monthStart,to:monthEnd});
+  const totals=monthLedger.reduce((sum,row)=>({gross:sum.gross+row.gross,deductions:sum.deductions+row.deductions,expenses:sum.expenses+row.expenses,net:sum.net+row.net,kg:sum.kg+row.kg,rounds:sum.rounds+row.rounds}),{gross:0,deductions:0,expenses:0,net:0,kg:0,rounds:0});
+  const plots=active(data.plots||[]);
+  const recent=[...active(data.tappings||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  const monthTappingRows=active(data.tappings||[]).filter((row)=>row.date>=monthStart&&row.date<=monthEnd);
+  const monthAcidCounts={pending:monthTappingRows.filter((row)=>row.acidStatus==='pending').length,applied:monthTappingRows.filter((row)=>row.acidStatus==='applied').length,skipped:monthTappingRows.filter((row)=>row.acidStatus==='skipped').length,unmarked:monthTappingRows.filter((row)=>!row.acidStatus).length};
+  const monthPlotRounds=monthLedger.filter((row)=>row.rounds>0).sort((a,b)=>b.rounds-a.rounds);
+  const maxPlotRounds=Math.max(1,...monthPlotRounds.map((row)=>row.rounds));
+  const yearOptions=[year-1,year,year+1].map((y)=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('');
+  const todayKey=dateKey();
+  const todayForecast=state.weather?.daily?.find((day)=>day.date===todayKey)||state.weather?.daily?.[0];
+  const rainChance=Math.round(Number(todayForecast?.rainChance??state.weather?.current?.precipitation_probability??0));
+  const rainThreshold=Number(data.settings?.rainThreshold||60);
+  const temp=todayForecast?.max??state.weather?.current?.temperature_2m;
+  const hasWeather=Boolean(todayForecast||state.weather?.current);
+  const hasLocation=Boolean(data.settings?.latitude&&data.settings?.longitude);
+  const weatherTitle=hasWeather?(rainChance>0?'วันนี้มีโอกาสฝน':'วันนี้โอกาสฝนน้อย'):'ยังไม่มีพยากรณ์วันนี้';
+  const weatherDetail=hasWeather?`โอกาสฝน ${rainChance}%${temp!=null?` · อุณหภูมิสูงสุด ${Math.round(temp)}°`:''}`:hasLocation?'กำลังโหลดข้อมูลอากาศ':'เพิ่มพิกัดสวนเพื่อดูโอกาสฝน';
+  const weatherTone=rainChance>=rainThreshold?'is-warning':'';
+  return `${pageTitle(`สวัสดี${user.displayName?` ${e(user.displayName)}`:''} 👋`,'ภาพรวมข้อมูลสวนยางของคุณ')}
+    <div class="weather-notice ${weatherTone}" role="status"><span class="weather-notice-icon">${icon(rainChance>=rainThreshold?'rain':'weather',20)}</span><div class="min-w-0 flex-1"><div class="font-semibold">${weatherTitle}</div><div class="mt-0.5 text-xs">${weatherDetail}</div></div>${hasWeather?`<span class="weather-notice-percent">${rainChance}%</span>`:''}<button class="weather-notice-refresh" data-action="weather-refresh" aria-label="อัปเดตพยากรณ์อากาศ">${icon('refresh',17)}</button></div>
+    <div class="my-3 rounded-[22px] bg-forest-900 p-5 text-white sm:p-6"><div class="flex flex-wrap items-center justify-between gap-4"><div><div class="text-sm text-white/65">เริ่มวันใหม่ให้สวนพร้อม</div><div class="mt-1 text-xl font-semibold">บันทึกรอบกรีดและติดตามผลผลิต</div><p class="mt-1 text-xs text-white/65">ข้อมูลล่าสุดของสวนยาง Jodyang</p></div><div class="flex gap-2">${user.role!=='viewer'?button('บันทึกรอบกรีด','new','tapping','!bg-white !text-forest-900','plus'):''}<button class="btn !bg-white/15 !text-white hover:!bg-white/25" data-action="go" data-page="weather">พยากรณ์อากาศ</button></div></div></div>
+    <section class="acid-status-section mt-2"><div class="mb-2 flex items-center justify-between gap-2"><div><h3 class="text-sm font-bold">สถานะหยอดกรด</h3><p class="mt-0.5 text-[11px] text-muted">รายการกรีดเดือนนี้ · แตะเพื่อดูรายการ</p></div><button class="btn btn-plain !min-h-9 !px-2 !py-1 text-xs" data-action="go" data-page="tapping">จัดการ →</button></div><div class="grid grid-cols-3 gap-2"><button class="acid-status-card is-pending" data-action="go" data-page="tapping"><span>${icon('calendar',17)}</span><strong>${number(monthAcidCounts.pending,0)}</strong><small>รอหยอดกรด</small></button><button class="acid-status-card is-applied" data-action="go" data-page="tapping"><span>${icon('check',17)}</span><strong>${number(monthAcidCounts.applied,0)}</strong><small>หยอดแล้ว</small></button><button class="acid-status-card is-skipped" data-action="go" data-page="tapping"><span>${icon('close',17)}</span><strong>${number(monthAcidCounts.skipped,0)}</strong><small>ไม่ได้หยอด</small></button></div>${monthAcidCounts.unmarked?`<p class="acid-unmarked-note">มีรายการกรีดเก่า ${number(monthAcidCounts.unmarked,0)} รายการที่ยังไม่ระบุสถานะ</p>`:''}</section>
+    <section class="monthly-summary card mt-3 p-4 sm:p-5"><div class="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h3 class="font-bold">สรุปเดือนนี้</h3><p class="mt-0.5 text-xs text-muted">ยอดรวมจากทุกแปลง · ${monthLabel}</p></div><span class="month-badge">เดือนปัจจุบัน</span></div><div class="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">${monthlyMetric('รายได้ก่อนหัก',`฿${money(totals.gross)}`,`${number(totals.kg)} กก. ที่ขายแล้ว`,'sale')}${monthlyMetric('ยอดสุทธิ',`฿${money(totals.net)}`,'หลังหักผู้ซื้อและค่าใช้จ่าย','share')}${monthlyMetric('มีดกรีดเดือนนี้',`${number(totals.rounds,0)} รอบ`,`${monthPlotRounds.length} แปลงมีบันทึก`,'tap')}${monthlyMetric('ค่าใช้จ่ายเดือนนี้',`฿${money(totals.expenses)}`,'รวมทุกรายการซื้อ','expense')}</div><div class="monthly-summary-note">หักจากผู้ซื้อ ฿${money(totals.deductions)} <span>·</span> น้ำหนักขาย ${number(totals.kg)} กก.</div></section>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_1fr]">
+      <section class="card p-5 sm:p-6"><div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="font-semibold">รายได้และค่าใช้จ่าย</h3><p class="mt-1 text-xs text-muted">ภาพรวมรายเดือนในปีที่เลือก</p></div><select class="field !w-auto !py-2 text-sm" data-filter="year">${yearOptions}</select></div><div class="mt-4 flex flex-wrap gap-4 text-xs"><span class="flex items-center gap-2"><i class="h-2.5 w-2.5 rounded-sm bg-forest-800"></i>รายได้ก่อนหัก</span><span class="flex items-center gap-2"><i class="h-2.5 w-2.5 rounded-sm bg-[#b9cee3]"></i>ค่าใช้จ่าย</span></div>${chartBars(series,'gross')}<div class="grid grid-cols-2 gap-3 border-t border-[#e8eef5] pt-4 text-sm"><div><span class="text-muted">รายได้ทั้งปี</span><div class="mt-1 font-bold">฿${money(series.reduce((a,b)=>a+b.gross,0))}</div></div><div><span class="text-muted">สุทธิทั้งปี</span><div class="mt-1 font-bold">฿${money(series.reduce((a,b)=>a+b.net,0))}</div></div></div></section>
+      <section class="card p-5 sm:p-6"><div class="flex items-center justify-between"><div><h3 class="font-semibold">แปลงสวน</h3><p class="mt-1 text-xs text-muted">พื้นที่ที่จัดการ</p></div><button class="btn btn-plain !px-2 !py-1 text-xs" data-action="go" data-page="plots">ดูทั้งหมด →</button></div><div class="mt-4 space-y-3">${plots.length?plots.slice(0,4).map((plot)=>`<div class="flex items-center gap-3 rounded-2xl bg-paper p-3"><div class="plot-marker grid h-10 w-10 place-items-center rounded-xl">${icon('plot',18)}</div><div class="min-w-0 flex-1"><div class="truncate text-sm font-semibold">${e(plot.name)}</div><div class="mt-0.5 text-xs text-muted">${number(plot.area,2)} ไร่ · ${number(plot.trees,0)} ต้น</div></div><div class="text-right text-xs text-muted">${e(plot.ownerName||'เจ้าของสวน')}</div></div>`).join(''):empty('ยังไม่มีแปลงสวน','เพิ่มข้อมูลแปลงเพื่อเริ่มใช้งาน')}</div></section>
+    </div>
+    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
+      <section class="card p-5 sm:p-6"><div class="flex items-center justify-between"><div><h3 class="font-semibold">รอบกรีดล่าสุด</h3><p class="mt-1 text-xs text-muted">แสดงชื่อแปลง คนกรีด และจำนวนรอบชัดเจน</p></div><button class="btn btn-plain !px-2 !py-1 text-xs" data-action="go" data-page="tapping">ดูทั้งหมด →</button></div>${recent.length?`<div class="mt-3 space-y-1">${recent.map((tap)=>`<div class="flex items-center gap-3 border-b border-[#f1f2ee] py-3 last:border-0"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#e8f2fc] text-leaf-700">${icon('tap',18)}</div><div class="min-w-0 flex-1"><div class="truncate text-sm font-semibold">${e(data.plots.find((plot)=>plot.id===tap.plotId)?.name||tap.plotName||'ไม่ระบุแปลง')}</div><div class="mt-0.5 text-xs text-muted">${dateLabel(tap.date)} · ${e(tap.tapperName||'ไม่ระบุคนกรีด')}</div></div><span class="round-count">${number(tap.rounds,0)} <small>รอบ</small></span></div>`).join('')}</div>`:empty('ยังไม่มีบันทึกรอบกรีด','บันทึกรอบกรีดแรกของสวนได้เลย')}</section>
+      <section class="card p-5 sm:p-6"><div class="flex items-center justify-between gap-2"><div><h3 class="font-semibold">รอบกรีดแยกตามแปลง</h3><p class="mt-1 text-xs text-muted">ยอดสะสมของเดือนนี้</p></div><span class="month-badge">${monthLabel}</span></div>${monthPlotRounds.length?`<div class="mt-4 space-y-4">${monthPlotRounds.slice(0,6).map((plot)=>`<div><div class="mb-1.5 flex items-center justify-between gap-2 text-sm"><span class="truncate font-medium">${e(plot.plotName)}</span><strong class="shrink-0 text-forest-900">${number(plot.rounds,0)} รอบ</strong></div><div class="month-plot-track"><span style="width:${Math.max(8,plot.rounds/maxPlotRounds*100)}%"></span></div></div>`).join('')}</div>`:empty('ยังไม่มีกรีดในเดือนนี้','บันทึกแต่ละรอบแล้วจะเห็นยอดแยกแปลงที่นี่')}</section>
+    </div>`;
+}
+const table = (headers, rows, emptyMessage = 'ยังไม่มีข้อมูล') => rows.length ? `<div class="table-scroller"><table class="data-table"><thead><tr>${headers.map((item)=>`<th>${item}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>` : empty(emptyMessage,'รายการจะแสดงที่นี่เมื่อมีการบันทึก');
+const searchBox = (placeholder = 'ค้นหาในรายการ') => `<label class="relative block w-full sm:w-64"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">${icon('search',16)}</span><input class="field !pl-9" data-search placeholder="${placeholder}"></label>`;
+const actions = (tableName, row, edit = true, remove = true) => `<div class="flex justify-end gap-1">${edit ? `<button class="btn btn-plain !p-2" data-action="edit" data-table="${tableName}" data-id="${e(row.id)}" aria-label="แก้ไข">${icon('edit',16)}</button>` : ''}${remove ? `<button class="btn btn-plain !p-2 hover:!text-[#a84031]" data-action="delete" data-table="${tableName}" data-id="${e(row.id)}" aria-label="ลบ">${icon('trash',16)}</button>` : ''}</div>`;
+
+function plotPicker(data, selectedIds, filterKey) {
+  const plots=active(data.plots||[]);const allIds=plots.map((plot)=>plot.id);const selected=selectedIds===null?allIds:selectedIds;
+  return `<section class="card p-4 sm:p-5"><div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="font-semibold">เลือกแปลงที่จะรวม</h3><p class="mt-1 text-xs text-muted">แตะแปลงเพื่อเพิ่มหรือนำออกจากยอดรวม</p></div><div class="flex gap-2"><button class="btn btn-soft !px-3 !py-2 text-xs" data-action="plot-filter-all" data-filter-key="${filterKey}">เลือกทั้งหมด</button><button class="btn btn-plain !px-3 !py-2 text-xs" data-action="plot-filter-none" data-filter-key="${filterKey}">ล้าง</button></div></div><div class="mt-4 flex flex-wrap gap-2">${plots.length?plots.map((plot)=>`<button type="button" class="plot-chip ${selected.includes(plot.id)?'is-selected':''}" aria-pressed="${selected.includes(plot.id)}" data-action="plot-filter-toggle" data-filter-key="${filterKey}" data-plot-id="${e(plot.id)}"><span class="plot-chip-check">${selected.includes(plot.id)?'✓':''}</span>${e(plot.name)}</button>`).join(''):`<span class="text-sm text-muted">ยังไม่มีแปลงสวน</span>`}</div><div class="mt-3 text-xs text-muted">เลือกอยู่ ${selected.length} จาก ${plots.length} แปลง</div></section>`;
+}
+
+function tappingPage(data, user) {
+  const rows=active(data.tappings||[]).sort((a,b)=>b.date.localeCompare(a.date));
+  const displayRows=rows.slice(0,7);
+  const canEdit=user.role!=='viewer';
+  const plotName=(row)=>data.plots.find((plot)=>plot.id===row.plotId)?.name||row.plotName||'ไม่ระบุแปลง';
+  const byPlot=new Map();
+  rows.forEach((row)=>{const key=row.plotId||plotName(row);const item=byPlot.get(key)||{name:plotName(row),rounds:0,logs:0};item.rounds+=Number(row.rounds||0);item.logs+=1;byPlot.set(key,item);});
+  const totalRounds=rows.reduce((sum,row)=>sum+Number(row.rounds||0),0);
+  const counts={pending:rows.filter((row)=>row.acidStatus==='pending').length,applied:rows.filter((row)=>row.acidStatus==='applied').length,skipped:rows.filter((row)=>row.acidStatus==='skipped').length,unmarked:rows.filter((row)=>!row.acidStatus).length};
+  const statuses=[['pending','รอหยอดกรด'],['applied','หยอดแล้ว'],['skipped','ไม่ได้หยอด']];
+  const statusLabel=(value)=>statuses.find(([key])=>key===value)?.[1]||'ยังไม่ระบุ';
+  const statusControl=(row)=>canEdit?`<select class="field acid-status-select ${row.acidStatus?`is-${row.acidStatus}`:'is-unmarked'}" data-acid-status data-id="${e(row.id)}" aria-label="สถานะหยอดกรด ${e(plotName(row))}">${!row.acidStatus?'<option value="" selected>ยังไม่ระบุ</option>':''}${statuses.map(([key,label])=>`<option value="${key}" ${row.acidStatus===key?'selected':''}>${label}</option>`).join('')}</select>`:`<span class="acid-status-pill ${row.acidStatus?`is-${row.acidStatus}`:'is-unmarked'}">${statusLabel(row.acidStatus)}</span>`;
+  const plotSummary=[...byPlot.values()].sort((a,b)=>b.rounds-a.rounds);
+  return `${pageTitle('บันทึกรอบกรีด','ติดตามจำนวนรอบและสถานะหยอดกรดแยกตามแปลง',canEdit?button('บันทึกรอบกรีด','new','tapping'): '')}
+    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">${stat('รอบกรีดทั้งหมด',number(totalRounds,0),'รวมทุกรายการ','tap')}${stat('รอหยอดกรด',number(counts.pending,0),'รายการกรีด','calendar','bg-[#eaf3fc] text-[#557da2]')}${stat('หยอดแล้ว',number(counts.applied,0),'รายการกรีด','check','bg-[#e5f0fb] text-[#4f7ea6]')}${stat('ไม่ได้หยอด',number(counts.skipped,0),'รายการกรีด','close','bg-[#f1f5fa] text-[#70849a]')}</div>
+    ${counts.unmarked?`<div class="acid-unmarked-note mt-3">มีบันทึกเก่า ${number(counts.unmarked,0)} รายการที่ยังไม่ระบุสถานะ เลือกสถานะจากรายการด้านล่างได้เลย</div>`:''}
+    <section class="card mt-4 p-4 sm:p-5"><div class="mb-3"><h3 class="font-semibold">สรุปรอบกรีดแยกตามแปลง</h3><p class="mt-1 text-xs text-muted">จำนวนรอบและรายการบันทึกสะสม</p></div><div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">${plotSummary.length?plotSummary.map((plot)=>`<article class="plot-summary-card"><div class="min-w-0"><div class="truncate font-semibold">${e(plot.name)}</div><div class="mt-1 text-xs text-muted">${number(plot.logs,0)} รายการบันทึก</div></div><div class="shrink-0 text-right"><div class="text-xl font-bold">${number(plot.rounds,0)}</div><div class="text-xs text-muted">รอบ</div></div></article>`).join(''):empty('ยังไม่มีรอบกรีด','เมื่อบันทึกรอบกรีด ยอดแยกแปลงจะแสดงที่นี่')}</div></section>
+    <section class="card mt-4 p-4 sm:p-5"><div class="mb-4 flex flex-wrap items-center justify-between gap-3">${searchBox('ค้นหาจาก 7 รายการล่าสุด')}<span class="text-xs text-muted">แสดง ${number(displayRows.length,0)} รายการล่าสุดจากทั้งหมด ${number(rows.length,0)}</span></div><div class="tap-log-list">${displayRows.length?displayRows.map((row)=>{const name=plotName(row);const searchText=[name,row.tapperName,row.note,statusLabel(row.acidStatus)].join(' ').toLowerCase();return `<article class="tap-log-card" data-searchable="${e(searchText)}"><div class="tap-log-top"><div class="min-w-0"><div class="tap-log-date">${dateLabel(row.date)}</div><h4 class="truncate font-bold">${e(name)}</h4></div><span class="round-count">${number(row.rounds,0)} <small>รอบ</small></span></div><div class="tap-log-meta"><span>${e(row.tapperName||'ไม่ระบุคนกรีด')}</span>${row.note?`<span class="tap-log-note">${e(row.note)}</span>`:''}</div><div class="tap-log-bottom"><label class="tap-log-status-label"><span>สถานะหยอดกรด</span>${statusControl(row)}</label>${canEdit?actions('tappings',row,true,true):''}</div></article>`;}).join(''):empty('ยังไม่มีบันทึกรอบกรีด','เมื่อบันทึกแล้ว รายการและสถานะหยอดกรดจะแสดงที่นี่')}</div></section>`;
+}
+function plotsPage(data, user) {
+  const plots = active(data.plots || []);
+  return `${pageTitle('แปลงสวน','ข้อมูลพื้นที่ จำนวนต้น และผู้รับส่วนแบ่ง',user.role === 'admin' ? button('เพิ่มแปลง','new','plot') : '')}<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">${plots.length ? plots.map((plot)=>`<article class="card p-5"><div class="flex items-start justify-between"><div class="plot-marker grid h-11 w-11 place-items-center rounded-2xl">${icon('plot',20)}</div>${user.role === 'admin'?actions('plots',plot,true,true):''}</div><h3 class="mt-4 text-lg font-bold">${e(plot.name)}</h3><div class="mt-1 text-xs text-muted">เจ้าของสวน: ${e(plot.ownerName || '—')}</div><div class="mt-5 grid grid-cols-2 gap-3"><div class="rounded-2xl bg-paper p-3"><div class="text-xs text-muted">พื้นที่</div><div class="mt-1 font-semibold">${number(plot.area,2)} ไร่</div></div><div class="rounded-2xl bg-paper p-3"><div class="text-xs text-muted">จำนวนต้น</div><div class="mt-1 font-semibold">${number(plot.trees,0)} ต้น</div></div></div><div class="mt-4 flex items-center justify-between border-t border-[#e8eef5] pt-4 text-xs text-muted"><span>${plot.latitude && plot.longitude ? `พิกัด ${number(plot.latitude,4)}, ${number(plot.longitude,4)}` : 'ยังไม่ได้ระบุพิกัด'}</span><button class="font-semibold text-leaf-700" data-action="go" data-page="shares">ส่วนแบ่ง →</button></div></article>`).join('') : `<div class="card col-span-full p-5">${empty('ยังไม่มีข้อมูลแปลงสวน','เพิ่มแปลงแรกเพื่อบันทึกรอบกรีดและการขาย')}</div>`}</div>`;
+}
+
+function salesPage(data, user) {
+  const rows = active(data.sales || []).sort((a,b)=>b.date.localeCompare(a.date));
+  const gross = rows.reduce((sum,row)=>sum+Number(row.totalKg||0)*Number(row.priceKg||0),0);
+  return `${pageTitle('การขายยาง','บันทึกการขายแยกจากรอบกรีด พร้อมน้ำหนักที่จัดสรรให้แต่ละแปลง',user.role === 'admin'?button('บันทึกการขาย','new','sale'): '')}<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">${stat('รายได้ก่อนหัก',`฿${money(gross)}`,`${rows.length} รายการขาย`,'sale')}${stat('น้ำหนักรวม',`${number(rows.reduce((a,r)=>a+Number(r.totalKg||0),0))} กก.`,'น้ำหนักจากรายการขาย','leaf','bg-[#e8f2fc] text-leaf-700')}${stat('รายการหักจากผู้ซื้อ',`฿${money(rows.reduce((a,r)=>a+Number(r.deductions||0),0))}`,'หักก่อนคิดยอดสุทธิ','expense','bg-[#f7efe3] text-[#986a30]')}</div><div class="card mt-4 p-4 sm:p-5"><div class="mb-4 flex flex-wrap items-center justify-between gap-3">${searchBox('ค้นหาผู้ซื้อหรือแปลง')}<span class="text-xs text-muted">${rows.length} รายการ</span></div>${table(['วันที่','ผู้ซื้อ','แปลงที่รวมขาย','น้ำหนัก','ราคา/กก.','ยอดก่อนหัก','รายการหัก','สุทธิ','ใบเสร็จ',...(user.role==='admin'?['']:[])],rows.map((row)=>{const plotNames=(row.allocations||[]).map((a)=>data.plots.find((p)=>p.id===a.plotId)?.name).filter(Boolean);const total=Number(row.totalKg||0)*Number(row.priceKg||0);return `<tr data-searchable="${e(`${row.buyer} ${plotNames.join(' ')}`.toLowerCase())}"><td>${dateLabel(row.date)}</td><td class="font-semibold">${e(row.buyer)}</td><td>${e([...new Set(plotNames)].join(', ')||'—')}</td><td>${number(row.totalKg)} กก.</td><td>฿${money(row.priceKg)}</td><td>฿${money(total)}</td><td>฿${money(row.deductions)}</td><td class="font-semibold">฿${money(total-Number(row.deductions||0))}</td><td>${row.receiptId?`<button class="btn btn-plain !p-1 text-xs" data-action="receipt" data-id="${e(row.receiptId)}">${icon('receipt',15)} ดู</button>`:'—'}</td>${user.role==='admin'?`<td>${actions('sales',row,true,true)}</td>`:''}</tr>`}),'ยังไม่มีรายการขาย')}</div>`;
+}
+
+function expensesPage(data, user) {
+  const rows = active(data.expenses || []).sort((a,b)=>b.date.localeCompare(a.date));
+  const total = rows.reduce((sum,row)=>sum+(row.allocations||[]).reduce((s,a)=>s+Number(a.amount||0),0),0);
+  const products = new Set(rows.map((row)=>row.category).filter(Boolean)).size;
+  return `${pageTitle('ซื้ออุปกรณ์และค่าใช้จ่าย','บันทึกสินค้าใหม่ได้ และแยกยอดที่ใช้ในแต่ละแปลง',user.role==='admin'?button('บันทึกรายการซื้อ','new','expense'): '')}<div class="grid grid-cols-2 gap-3 lg:grid-cols-3">${stat('ค่าใช้จ่ายรวม',`฿${money(total)}`,`${rows.length} รายการซื้อ`,'expense','bg-[#f7efe3] text-[#986a30]')}${stat('รายการสินค้า',number(products,0),'เลือกชื่อเดิมหรือพิมพ์ชื่อใหม่','plot','bg-[#e8f2fc] text-leaf-700')}</div><div class="card mt-4 p-4 sm:p-5"><div class="mb-4 flex flex-wrap items-center justify-between gap-3">${searchBox('ค้นหาสินค้าหรือแปลง')}<span class="text-xs text-muted">${rows.length} รายการ</span></div>${table(['วันที่','สินค้า / อุปกรณ์','รายละเอียด / จำนวน','แปลงที่จัดสรรค่าใช้จ่าย','ยอดรวม','ใบเสร็จ',...(user.role==='admin'?['']:[])],rows.map((row)=>{const names=(row.allocations||[]).map((a)=>`${data.plots.find((p)=>p.id===a.plotId)?.name||'แปลง'} ฿${money(a.amount)}`);const amount=(row.allocations||[]).reduce((s,a)=>s+Number(a.amount||0),0);return `<tr data-searchable="${e(`${row.category} ${row.description} ${names.join(' ')}`.toLowerCase())}"><td>${dateLabel(row.date)}</td><td class="font-semibold">${e(row.category||'ไม่ระบุรายการ')}</td><td class="text-muted">${e(row.description||'—')}</td><td>${e(names.join(', ')||'—')}</td><td class="font-semibold">฿${money(amount)}</td><td>${row.receiptId?`<button class="btn btn-plain !p-1 text-xs" data-action="receipt" data-id="${e(row.receiptId)}">${icon('receipt',15)} ดู</button>`:'—'}</td>${user.role==='admin'?`<td>${actions('expenses',row,true,true)}</td>`:''}</tr>`}),'ยังไม่มีรายการซื้อ')}</div>`;
+}
+
+function sharesPage(data, state, user) {
+  const selected=state.sharePlots===null?active(data.plots||[]).map((plot)=>plot.id):state.sharePlots;
+  const ledger=plotLedger(data,state.range||{}).filter((row)=>selected.includes(row.plotId));
+  const people=shareTotals(ledger);
+  const totals=ledger.reduce((sum,row)=>({gross:sum.gross+row.gross,deductions:sum.deductions+row.deductions,expenses:sum.expenses+row.expenses,net:sum.net+row.net}),{gross:0,deductions:0,expenses:0,net:0});
+  const assignedByPlot=new Map();active(data.shares||[]).forEach((row)=>assignedByPlot.set(row.plotId,(assignedByPlot.get(row.plotId)||0)+Number(row.percent||0)));
+  const formatBreakdown=(row)=>row.byPlot.map((plot)=>`<div class="share-breakdown-row"><span><strong>${e(plot.plotName)}</strong><small>${number(plot.percent,2)}% ของแปลง</small></span><span class="font-semibold">฿${money(plot.net)}</span></div>`).join('');
+  const plotCards=ledger.map((row)=>{const percent=assignedByPlot.get(row.plotId)||0;const complete=Math.abs(percent-100)<.01;return `<article class="share-plot-card"><div class="flex flex-wrap items-start justify-between gap-3"><div><h4 class="text-base font-bold">${e(row.plotName)}</h4><p class="mt-1 text-xs text-muted">น้ำหนักขาย ${number(row.kg)} กก. · รอบกรีด ${number(row.rounds,0)} รอบ</p></div><span class="pill ${complete?'bg-[#e8f2fc] text-forest-800':'bg-[#fff3df] text-[#8e622d]'}">${complete?'แบ่งครบ':'ตรวจสัดส่วน'} · ${number(percent,2)}%</span></div><div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5"><div class="share-metric"><small>ยอดขาย</small><b>฿${money(row.gross)}</b></div><div class="share-metric"><small>หักผู้ซื้อ</small><b>−฿${money(row.deductions)}</b></div><div class="share-metric"><small>ค่าใช้จ่าย</small><b>−฿${money(row.expenses)}</b></div><div class="share-metric share-metric-net"><small>สุทธิแปลงนี้</small><b>฿${money(row.net)}</b></div><div class="share-metric"><small>จัดสรรให้</small><b>${row.shares.length} คน</b></div></div><div class="mt-4 border-t border-[#edf0eb] pt-3">${row.shares.length?row.shares.map((share)=>`<div class="share-recipient-row"><span><strong>${e(share.personName)}</strong><small>${share.role==='owner'?'เจ้าของสวน':'คนกรีด'} · ${number(share.percent,2)}%</small></span><strong>฿${money(share.netAmount)}</strong></div>`).join(''):`<div class="text-sm text-[#8e622d]">ยังไม่ได้กำหนดผู้รับส่วนแบ่ง</div>`}</div></article>`;});
+  const personCards=people.map((row)=>`<article class="share-person-card"><div class="flex items-start justify-between gap-3"><div><h4 class="font-bold">${e(row.personName)}</h4><span class="mt-1 inline-flex pill ${row.role==='owner'?'bg-[#e8f2fc] text-forest-800':'bg-[#edf4fb] text-[#496b8d]'}">${row.role==='owner'?'เจ้าของสวน':'คนกรีด'}</span></div><div class="text-right"><small class="text-muted">รับสุทธิ</small><div class="text-xl font-bold text-forest-900">฿${money(row.net)}</div></div></div><div class="mt-4 grid grid-cols-2 gap-2"><div class="share-metric"><small>ส่วนแบ่งจากยอดขาย</small><b>฿${money(row.gross)}</b></div><div class="share-metric"><small>หักจากผู้ซื้อ</small><b>−฿${money(row.deductions)}</b></div><div class="share-metric"><small>ค่าใช้จ่าย</small><b>−฿${money(row.expenses)}</b></div><div class="share-metric share-metric-net"><small>รวมสุทธิ</small><b>฿${money(row.net)}</b></div></div><div class="mt-3 border-t border-[#edf0eb] pt-2">${formatBreakdown(row)}</div></article>`);
+  return `${pageTitle('ส่วนแบ่งผลผลิต','เลือกแปลงและช่วงเวลา แล้วดูยอดรวมกับรายละเอียดรายแปลง',user.role==='admin'?button('ตั้งค่าส่วนแบ่ง','new','share'): '')}<div class="mb-4 flex flex-wrap items-end gap-3">${datePickerField('ตั้งแต่','from',state.range?.from||'')}${datePickerField('ถึง','to',state.range?.to||'')}</div>${plotPicker(data,state.sharePlots,'share')}<div class="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">${stat('ยอดขายรวม',`฿${money(totals.gross)}`,'ก่อนหักจากผู้ซื้อ','sale')}${stat('รายการหัก',`฿${money(totals.deductions)}`,'หักจากผู้ซื้อ','expense','bg-[#f7efe3] text-[#986a30]')}${stat('ค่าใช้จ่ายแปลง',`฿${money(totals.expenses)}`,'เฉพาะแปลงที่เลือก','expense','bg-[#f7efe3] text-[#986a30]')}${stat('สุทธิหลังหัก',`฿${money(totals.net)}`,'ยอดที่นำไปแบ่งตามสัดส่วน','share','bg-[#e8f2fc] text-leaf-700')}</div><section class="mt-4"><div class="mb-3"><h3 class="text-lg font-bold">รวมตามผู้รับ</h3><p class="mt-1 text-sm text-muted">คนเดียวกันถูกรวมข้ามแปลง พร้อมแจกแจงยอดจากแต่ละแปลงด้านล่าง</p></div>${people.length?`<div class="grid grid-cols-1 gap-3 xl:grid-cols-2">${personCards.join('')}</div>`:`<div class="card p-6 text-center text-sm text-muted">${selected.length?'ยังไม่มีส่วนแบ่งที่ตั้งไว้ในแปลงที่เลือก':'เลือกอย่างน้อยหนึ่งแปลงเพื่อดูยอดรวม'}</div>`}</section><section class="mt-5"><div class="mb-3"><h3 class="text-lg font-bold">รายละเอียดแยกตามแปลง</h3><p class="mt-1 text-sm text-muted">ตรวจน้ำหนัก รายการหัก ค่าใช้จ่าย และเปอร์เซ็นต์ที่จัดสรร</p></div><div class="grid grid-cols-1 gap-3 xl:grid-cols-2">${plotCards.length?plotCards.join(''):`<div class="card p-6 text-center text-sm text-muted">${selected.length?'ไม่มีรายการของแปลงในช่วงเวลานี้':'เลือกแปลงอย่างน้อยหนึ่งรายการ'}</div>`}</div></section>${user.role==='admin'?`<section class="card mt-5 p-5"><div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-semibold">ตั้งค่าส่วนแบ่ง</h3><p class="mt-1 text-xs text-muted">เปอร์เซ็นต์ของผู้รับในแต่ละแปลงควรรวมกันให้ได้ 100%</p></div>${button('เพิ่มผู้รับส่วนแบ่ง','new','share','btn-soft')}</div><div class="mt-3">${table(['แปลง','ชื่อผู้รับ','ประเภท','สัดส่วน','จัดการ'],active(data.shares||[]).map((row)=>`<tr><td>${e(data.plots.find((plot)=>plot.id===row.plotId)?.name||'—')}</td><td class="font-semibold">${e(row.personName)}</td><td>${row.role==='owner'?'เจ้าของสวน':'คนกรีด'}</td><td>${number(row.percent,2)}%</td><td>${actions('shares',row,true,true)}</td></tr>`),'ยังไม่มีผู้รับส่วนแบ่ง')}</div></section>`:''}`;
+}
+
+function usersPage(data,user) {
+  const rows=active(data.users||[]);const counts=new Map();
+  rows.forEach((row)=>{const key=String(row.username||'').trim().toLowerCase();counts.set(key,(counts.get(key)||0)+1);});
+  const conflicts=[...counts.values()].filter((count)=>count>1).length;
+  const tableRows=rows.map((row)=>{
+    const duplicate=counts.get(String(row.username||'').trim().toLowerCase())>1;
+    const role=row.role==='admin'?'แอดมิน':row.role==='tapper'?'คนกรีด':'ผู้ดูข้อมูล';
+    const actionsHtml=row.id===user.id?'บัญชีนี้':`${duplicate?`<button class="btn btn-soft !px-3 !py-2 text-xs" data-action="rename-user" data-id="${e(row.id)}">เปลี่ยนชื่อ</button>`:''}<button class="btn btn-plain !px-3 !py-2 text-xs" data-action="toggle-user" data-id="${e(row.id)}">${row.active?'ปิด':'เปิด'}</button><button class="btn btn-delete-confirm !px-3 !py-2 text-xs" data-action="delete-user" data-id="${e(row.id)}">ลบ</button>`;
+    return `<tr class="${duplicate?'duplicate-user-row':''}" data-searchable="${e(`${row.username} ${row.displayName}`.toLowerCase())}"><td class="font-semibold">${e(row.username)}${duplicate?'<span class="ml-2 pill duplicate-pill">ซ้ำ</span>':''}</td><td>${e(row.displayName)}</td><td>${role}</td><td><span class="pill ${row.active?'bg-[#e8f2fc] text-forest-800':'bg-[#f4eded] text-[#a84031]'}">${row.active?'ใช้งาน':'ปิดใช้งาน'}</span></td><td>${dateLabel((row.createdAt||'').slice(0,10))}</td><td><div class="flex flex-wrap justify-end gap-1">${actionsHtml}</div></td></tr>`;
+  });
+  return `${pageTitle('ผู้ใช้งาน','สร้างบัญชี แก้ชื่อซ้ำ เปิด/ปิด หรือลบบัญชีที่ไม่ใช้แล้ว',button('เพิ่มบัญชี','new','user'))}${conflicts?`<div class="mb-4 rounded-2xl border border-[#f1d6aa] bg-[#fff8eb] p-4 text-sm text-[#765c36]"><strong>พบชื่อผู้ใช้ซ้ำ</strong><span class="ml-1">เปลี่ยนชื่อบัญชี หรือเอาบัญชีที่ไม่ใช้แล้วออก เพื่อให้เข้าสู่ระบบได้ถูกบัญชี</span></div>`:''}<div class="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3">${stat('บัญชีทั้งหมด',number(rows.length,0),'รวมบัญชีที่ปิดใช้งาน','users')}${stat('บัญชีใช้งาน',number(rows.filter((row)=>row.active!==false).length,0),'พร้อมเข้าสู่ระบบ','leaf','bg-[#e8f2fc] text-leaf-700')}${stat('ชื่อผู้ใช้ซ้ำ',number(conflicts,0),'จัดการชื่อที่ซ้ำได้จากรายการ','audit','bg-[#fff3e3] text-[#986a30]')}</div><div class="card p-4 sm:p-5"><div class="mb-4 flex flex-wrap items-center justify-between gap-3">${searchBox('ค้นหาชื่อผู้ใช้หรือชื่อที่แสดง')}<span class="text-xs text-muted">${rows.length} บัญชี</span></div>${table(['ชื่อผู้ใช้','ชื่อที่แสดง','สิทธิ์','สถานะ','สร้างเมื่อ','จัดการ'],tableRows,'ยังไม่มีบัญชีอื่น')}</div>`;
+}
+
+function auditPage(data) {
+  const rows=active(data.audit||[]).sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,300);
+  return `${pageTitle('ประวัติการใช้งาน','ตรวจสอบผู้ทำรายการ การแก้ไข และการลบข้อมูล')}<div class="card p-4 sm:p-5">${searchBox('ค้นหาชื่อผู้ใช้หรือรายการ')}<div class="mt-3">${table(['วันและเวลา','ผู้ใช้','กิจกรรม','รายการ','รายละเอียด'],rows.map((row)=>`<tr data-searchable="${e(`${row.actorName} ${row.action} ${row.table} ${row.summary}`.toLowerCase())}"><td>${new Date(row.at).toLocaleString('th-TH')}</td><td class="font-semibold">${e(row.actorName)}</td><td><span class="pill bg-paper">${e(row.action)}</span></td><td>${e(row.table)}</td><td class="text-muted">${e(row.summary||'—')}</td></tr>`),'ยังไม่มีประวัติ')}</div></div>`;
+}
+
+function reportsPage(data, state) {
+  const selected=state.reportPlots===null?active(data.plots||[]).map((plot)=>plot.id):state.reportPlots;
+  const ledger=plotLedger(data,state.range||{}).filter((row)=>selected.includes(row.plotId));const people=shareTotals(ledger);
+  return `${pageTitle('รายงานสวน','เลือกแปลงและช่วงเวลาเพื่อดาวน์โหลด Excel หรือพิมพ์รายงาน')}<div class="mb-4 flex flex-wrap items-end gap-3">${datePickerField('ตั้งแต่','from',state.range?.from||'')}${datePickerField('ถึง','to',state.range?.to||'')}<div class="flex gap-2"><button class="btn btn-primary" data-action="export">${icon('download',17)}ดาวน์โหลด Excel</button><button class="btn btn-soft" data-action="print">พิมพ์ / บันทึก PDF</button></div></div>${plotPicker(data,state.reportPlots,'report')}<div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">${stat('ยอดขาย',`฿${money(ledger.reduce((a,b)=>a+b.gross,0))}`,'ก่อนหักจากผู้ซื้อ','sale')}${stat('น้ำหนัก',`${number(ledger.reduce((a,b)=>a+b.kg,0))} กก.`,'รายการขาย','leaf')}${stat('หักและค่าใช้จ่าย',`฿${money(ledger.reduce((a,b)=>a+b.expenses+b.deductions,0))}`,'ตามแปลงที่เลือก','expense')}${stat('ยอดสุทธิ',`฿${money(ledger.reduce((a,b)=>a+b.net,0))}`,'หลังหักทั้งหมด','share')}</div><div class="card mt-4 p-4 sm:p-5">${table(['ผู้รับส่วนแบ่ง','ประเภท','แปลงที่รวม','ยอดขายก่อนหัก','หักผู้ซื้อ','ค่าใช้จ่าย','ยอดสุทธิ'],people.map((person)=>`<tr><td class="font-semibold">${e(person.personName)}</td><td>${person.role==='owner'?'เจ้าของสวน':'คนกรีด'}</td><td>${person.byPlot.map((plot)=>`${e(plot.plotName)} (${number(plot.percent,2)}%)`).join(', ')}</td><td>฿${money(person.gross)}</td><td>−฿${money(person.deductions)}</td><td>−฿${money(person.expenses)}</td><td class="font-bold">฿${money(person.net)}</td></tr>`),'ยังไม่มีข้อมูลสำหรับแปลงและช่วงเวลาที่เลือก')}</div>`;
+}
+
+function weatherPage(data,state) {
+  const w=state.weather;const days=w?.daily||[];const hours=(w?.hourly||[]).slice(0,Number(data.settings?.hourlyHours||24));
+  return `${pageTitle('สภาพอากาศ','พยากรณ์ใกล้ตำแหน่งสวน พร้อมแจ้งเตือนฝนในหน้าเว็บ',`<button class="btn btn-soft" data-action="weather-refresh">${icon('refresh',16)}อัปเดต</button>`)}<div class="grid grid-cols-1 gap-4 xl:grid-cols-[.85fr_1.15fr]"><section class="card p-5"><div class="flex items-center justify-between"><div><div class="text-xs text-muted">ตำแหน่งพยากรณ์</div><div class="mt-1 font-semibold">${e(data.settings?.locationName||'ยังไม่ได้กำหนด')}</div></div><button class="btn btn-plain !p-2" data-action="edit-weather">${icon('settings',17)}</button></div>${w?`<div class="mt-6 flex items-center justify-between"><div><div class="text-5xl font-semibold">${Math.round(w.current?.temperature_2m||0)}°</div><div class="mt-2 text-sm">${e(w.summary||'สภาพอากาศปัจจุบัน')}</div><div class="mt-1 text-xs text-muted">ฝน ${number(w.current?.precipitation_probability,0)}% · ลม ${number(w.current?.wind_speed_10m,0)} กม./ชม.</div></div><div class="grid h-16 w-16 place-items-center rounded-3xl bg-[#e8f2fc] text-leaf-700">${icon(Number(w.current?.precipitation_probability||0)>40?'rain':'weather',34)}</div></div>`:`<div class="mt-6 rounded-2xl bg-paper p-4 text-sm text-muted">${data.settings?.latitude&&data.settings?.longitude?'กำลังโหลดข้อมูลอากาศ หรือเชื่อมต่ออินเทอร์เน็ตเพื่อลองอีกครั้ง':'กำหนดพิกัดแปลงหรือใช้ตำแหน่งปัจจุบัน'}</div>`}<div class="mt-5 rounded-2xl ${state.rainAlert?'bg-[#fff3e3] text-[#8f6127]':'bg-paper text-[#677068]'} p-4"><div class="flex items-center gap-2 font-semibold">${icon(state.rainAlert?'rain':'weather',18)}${state.rainAlert?'แจ้งเตือนฝน':'การแจ้งเตือน'}</div><p class="mt-1 text-xs">${state.rainAlert?`คาดว่าฝนจะตก ${e(state.rainAlert)}`:'จะเตือนในหน้านี้เมื่อโอกาสฝนถึงเกณฑ์ที่ตั้งไว้'}</p></div><div class="mt-5 flex gap-3">${button('ใช้ตำแหน่งปัจจุบัน','geolocate',null,'btn-soft','plot')}<button class="btn btn-plain" data-action="go" data-page="plots">ดูพิกัดแปลง</button></div><div class="mt-5 border-t border-[#e8eef5] pt-3 text-[11px] text-muted">ข้อมูลจาก <a class="underline" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> · CC BY 4.0</div></section><section class="card p-5"><div class="flex flex-wrap items-center justify-between gap-2"><div><h3 class="font-semibold">พยากรณ์รายวัน</h3><p class="mt-1 text-xs text-muted">${days.length} วันข้างหน้า</p></div><select class="field !w-auto !py-2 text-sm" data-filter="forecast-days"><option value="3" ${Number(data.settings?.forecastDays||7)===3?'selected':''}>3 วัน</option><option value="5" ${Number(data.settings?.forecastDays||7)===5?'selected':''}>5 วัน</option><option value="7" ${Number(data.settings?.forecastDays||7)===7?'selected':''}>7 วัน</option></select></div><div class="mt-4">${days.length?table(['วัน','อุณหภูมิต่ำ/สูง','โอกาสฝน','ปริมาณฝน'],days.map((d)=>`<tr><td class="font-semibold">${new Date(`${d.date}T00:00:00`).toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short'})}</td><td>${Math.round(d.min)}° / ${Math.round(d.max)}°</td><td><span class="pill ${d.rainChance>50?'bg-[#fff3e3] text-[#8f6127]':'bg-paper'}">${Math.round(d.rainChance)}%</span></td><td>${number(d.rain,1)} มม.</td></tr>`),'ยังไม่มีพยากรณ์อากาศ'):`<div class="py-10 text-center text-sm text-muted">ตั้งค่าพิกัดเพื่อดูพยากรณ์</div>`}</div></section></div><section class="card mt-4 p-5"><div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-semibold">พยากรณ์รายชั่วโมง</h3><p class="mt-1 text-xs text-muted">ตรวจดูโอกาสฝนและฝนสะสมเป็นรายชั่วโมง</p></div><select class="field !w-auto !py-2 text-sm" data-filter="hourly-hours"><option value="24" ${Number(data.settings?.hourlyHours||24)===24?'selected':''}>24 ชั่วโมง</option><option value="48" ${Number(data.settings?.hourlyHours||24)===48?'selected':''}>48 ชั่วโมง</option><option value="72" ${Number(data.settings?.hourlyHours||24)===72?'selected':''}>72 ชั่วโมง</option></select></div><div class="mt-4">${hours.length?table(['เวลา','อุณหภูมิ','โอกาสฝน','ฝนสะสม'],hours.map((h)=>`<tr><td>${new Date(h.time).toLocaleString('th-TH',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</td><td>${Math.round(h.temperature)}°</td><td>${Math.round(h.rainChance)}%</td><td>${number(h.rain,1)} มม.</td></tr>`),'ยังไม่มีข้อมูลรายชั่วโมง'):`<div class="py-8 text-center text-sm text-muted">เชื่อมต่ออินเทอร์เน็ตเพื่อโหลดพยากรณ์รายชั่วโมง</div>`}</div><div class="mt-4 text-right text-[11px] text-muted">ข้อมูลจาก <a class="underline" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a></div></section>`;
+}
+
+function settingsPage(data,user) {
+  const s=data.settings||{};
+  return `${pageTitle('ตั้งค่าระบบ','ตำแหน่งสวน การแจ้งเตือน และข้อมูลซิงก์')}<div class="grid grid-cols-1 gap-4 xl:grid-cols-2"><section class="card p-5"><h3 class="font-semibold">ตำแหน่งและสภาพอากาศ</h3><p class="mt-1 text-xs text-muted">ใช้พิกัดเพื่อแสดงพยากรณ์และเตือนฝน</p><form class="mt-4 space-y-3" data-form="settings"><label class="block text-sm">ชื่อสถานที่<input class="field mt-1" name="locationName" value="${e(s.locationName||'')}" placeholder="เช่น บ้านสวน อำเภอ..."></label><div class="grid grid-cols-2 gap-3"><label class="block text-sm">ละติจูด<input class="field mt-1" name="latitude" type="number" step="any" value="${e(s.latitude||'')}"></label><label class="block text-sm">ลองจิจูด<input class="field mt-1" name="longitude" type="number" step="any" value="${e(s.longitude||'')}"></label></div><div class="grid grid-cols-2 gap-3"><label class="block text-sm">พยากรณ์รายวัน<select class="field mt-1" name="forecastDays"><option value="3" ${Number(s.forecastDays||7)===3?'selected':''}>3 วัน</option><option value="5" ${Number(s.forecastDays||7)===5?'selected':''}>5 วัน</option><option value="7" ${Number(s.forecastDays||7)===7?'selected':''}>7 วัน</option></select></label><label class="block text-sm">รายชั่วโมง<select class="field mt-1" name="hourlyHours"><option value="24" ${Number(s.hourlyHours||24)===24?'selected':''}>24 ชั่วโมง</option><option value="48" ${Number(s.hourlyHours||24)===48?'selected':''}>48 ชั่วโมง</option><option value="72" ${Number(s.hourlyHours||24)===72?'selected':''}>72 ชั่วโมง</option></select></label></div><label class="block text-sm">แจ้งเตือนเมื่อโอกาสฝนตั้งแต่ (%)<input class="field mt-1" name="rainThreshold" type="number" min="1" max="100" value="${e(s.rainThreshold||60)}"></label><button class="btn btn-primary" type="submit">บันทึกการตั้งค่า</button><button class="btn btn-soft" type="button" data-action="geolocate">ใช้ตำแหน่งปัจจุบัน</button></form></section><section class="card p-5"><h3 class="font-semibold">สถานะข้อมูล</h3><div class="mt-4 space-y-3 text-sm"><div class="flex justify-between rounded-xl bg-paper p-3"><span>บัญชีที่ใช้งาน</span><b>${e(user.displayName||user.username)}</b></div><div class="flex justify-between rounded-xl bg-paper p-3"><span>แปลงสวน</span><b>${active(data.plots||[]).length}</b></div><div class="flex justify-between rounded-xl bg-paper p-3"><span>บันทึกรอบกรีด</span><b>${active(data.tappings||[]).length}</b></div><div class="flex justify-between rounded-xl bg-paper p-3"><span>รายการขาย</span><b>${active(data.sales||[]).length}</b></div></div><button class="btn btn-soft mt-4" data-action="sync">${icon('refresh',17)}ซิงก์ข้อมูลตอนนี้</button><div class="mt-5 border-t border-[#e8eef5] pt-4"><button class="btn btn-plain" data-action="change-password">เปลี่ยนรหัสผ่าน</button></div></section></div>`;
+}
+
+export function pageView(page, data, user, state) {
+  switch (page) {
+    case 'dashboard': return dashboard(data,user,state);
+    case 'tapping': return tappingPage(data,user);
+    case 'plots': return plotsPage(data,user);
+    case 'sales': return salesPage(data,user);
+    case 'expenses': return expensesPage(data,user);
+    case 'shares': return sharesPage(data,state,user);
+    case 'weather': return weatherPage(data,state);
+    case 'reports': return reportsPage(data,state);
+    case 'users': return user.role==='admin'?usersPage(data,user):pageTitle('ไม่มีสิทธิ์','หน้านี้สำหรับแอดมิน');
+    case 'audit': return user.role==='admin'?auditPage(data):pageTitle('ไม่มีสิทธิ์','หน้านี้สำหรับแอดมิน');
+    case 'settings': return user.role==='admin'?settingsPage(data,user):pageTitle('ไม่มีสิทธิ์','หน้านี้สำหรับแอดมิน');
+    default: return dashboard(data,user,state);
+  }
+}
